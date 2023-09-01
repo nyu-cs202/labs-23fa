@@ -8,8 +8,19 @@ verbose=false
 arch="`arch`"
 tag=
 platform=
+winpty=false
 while test "$#" -ne 0; do
-    if test "$1" = "-f" -o "$1" = "--fresh"; then
+    if test "$1" = "-w" -o "$1" = "--winpty"; then
+        winpty=true
+        ostype=$(echo "$OSTYPE" | tr "[:upper:]" "[:lower:]")
+        case "${ostype}" in
+            mingw*|msys*|cygwin*)
+                ;;
+            *) echo "\`winpty\` only works on Windows (${ostype})" 1>&2
+                exit 1
+        esac
+        shift
+    elif test "$1" = "-f" -o "$1" = "--fresh"; then
         fresh=1
         shift
     elif test "$1" = "-V" -o "$1" = "--verbose"; then
@@ -31,7 +42,7 @@ while test "$#" -ne 0; do
         if test "$arch" = "arm64" -o "$arch" = "aarch64"; then
             armtext=" [-a|--arm] [-x|--x86-64]"
         fi
-        echo "Usage: cs202-run-docker [-f|--fresh]$armtext [-V|--verbose]" 1>&2
+        echo "Usage: cs202-run-docker [-f|--fresh]$armtext [-w|--winpty] [-V|--verbose]" 1>&2
         exit 1
     fi
 done
@@ -53,6 +64,7 @@ vexec () {
     fi
     exec "$@"
 }
+
 
 if stat --format %i / >/dev/null 2>&1; then
     statformatarg="--format"
@@ -114,9 +126,17 @@ elif test -x /bin/netstat; then
         netarg="$netarg "'--expose=12949/tcp -p 12949:12949/tcp'
     fi
 fi
-
+    
 if test -n "$maindir"; then
-    vexec docker run -it --platform $platform --rm --privileged --cap-add=SYS_PTRACE --cap-add=NET_ADMIN --security-opt seccomp=unconfined -v "$maindir":/home/cs202-user/$destdir$ssharg -w "/home/cs202-user/$destdir$subdir" $netarg$sshenvarg $tag
+    if $winpty; then
+        vexec winpty docker run -it --platform $platform --rm --privileged --cap-add=SYS_PTRACE --cap-add=NET_ADMIN --security-opt seccomp=unconfined -v "$maindir":/home/cs202-user/$destdir$ssharg -w "/home/cs202-user/$destdir$subdir" $netarg$sshenvarg $tag
+    else
+        vexec docker run -it --platform $platform --rm --privileged --cap-add=SYS_PTRACE --cap-add=NET_ADMIN --security-opt seccomp=unconfined -v "$maindir":/home/cs202-user/$destdir$ssharg -w "/home/cs202-user/$destdir$subdir" $netarg$sshenvarg $tag
+    fi
 else
-    vexec docker run -it --platform $platform --rm --privileged --cap-add=SYS_PTRACE --cap-add=NET_ADMIN --security-opt seccomp=unconfined $netarg$sshenvarg $tag
+    if $winpty; then
+        vexec winpty docker run -it --platform $platform --rm --privileged --cap-add=SYS_PTRACE --cap-add=NET_ADMIN --security-opt seccomp=unconfined $netarg$sshenvarg $tag
+    else
+        vexec docker run -it --platform $platform --rm --privileged --cap-add=SYS_PTRACE --cap-add=NET_ADMIN --security-opt seccomp=unconfined $netarg$sshenvarg $tag
+    fi
 fi
