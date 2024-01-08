@@ -57,7 +57,9 @@ RUN apt-get -y install\
  psmisc\
  sudo\
  vim\
- wget
+ wget\
+ screen\
+ tmux
 
 # set up libraries
 RUN apt-get -y install\
