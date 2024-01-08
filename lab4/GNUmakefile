@@ -89,9 +89,6 @@ run-%: run-qemu-%
 run-qemu-%: run-$(QEMUDISPLAY)-%
 	@:
 
-# run-graphic-%: %.img check-qemu
-#	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUOPT) $(QEMUIMG),QEMU $<)
-
 run-console-%: %.img check-qemu
 	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUOPT) -display curses $(QEMUIMG),QEMU $<)
 
@@ -100,6 +97,11 @@ run-nographic-%: %.img check-qemu
 
 run-nographic-grade-%: %.img check-qemu
 	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUGRADEOPT) -parallel file:$(TMPFILE) -nographic $(QEMUIMG),QEMU $<)
+
+# Note, different from the GDB bits above, this one waits for connection. This
+# is necessary to catch bugs early in the run.
+run-gdb-grade-%: %.img check-qemu
+	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUGRADEOPT) -display curses -gdb tcp::1234 -S -parallel file:$(TMPFILE) $(QEMUIMG),QEMU $<)
 
 run-monitor-%: %.img check-qemu
 	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUOPT) -monitor stdio $(QEMUIMG),QEMU $<)
@@ -114,6 +116,7 @@ run-gdb-%: run-gdb-$(QEMUDISPLAY)-%
 run-gdb-console-%: %.img check-qemu
 	$(call run,$(QEMU_PRELOAD) $(QEMU) $(QEMUOPT) -display curses -gdb tcp::1234 $(QEMUIMG),QEMU $<)
 
+
 run: run-qemu-$(basename $(IMAGE))
 run-qemu: run-qemu-$(basename $(IMAGE))
 # run-graphic: run-graphic-$(basename $(IMAGE))
@@ -123,10 +126,9 @@ run-console: run-console-$(basename $(IMAGE))
 run-monitor: run-monitor-$(basename $(IMAGE))
 run-quit: run-quit-$(basename $(IMAGE))
 run-gdb: run-gdb-$(basename $(IMAGE))
-# run-gdb-graphic: run-gdb-graphic-$(basename $(IMAGE))
 run-gdb-console: run-gdb-console-$(basename $(IMAGE))
-# run-graphic-gdb: run-gdb-graphic-$(basename $(IMAGE))
 run-console-gdb: run-gdb-console-$(basename $(IMAGE))
+run-gdb-grade: run-gdb-grade-$(basename $(IMAGE))
 
 # Grading targets
 grade-one: 
@@ -141,6 +143,9 @@ grade-five:
 	$(call run,TMPFILE=$$(mktemp); $(MAKE) run-nographic-grade TICK_LIMIT=1000 NO_SLOWDOWN=1 TMPFILE=$$TMPFILE > /dev/null 2>&1; python3 parse_log.py --tmpfile $$TMPFILE --grade_up_to 4 --output score)
 	$(call run,TMPFILE=$$(mktemp); $(MAKE) run-nographic-grade FORCE_FORK=1 TICK_LIMIT=1000 NO_SLOWDOWN=1 TMPFILE=$$TMPFILE > /dev/null 2>&1; python3 parse_log.py --tmpfile $$TMPFILE --grade_from 4 --grade_up_to 5 --output score_five)
 	$(call run,paste score score_five | awk '{print "Total score: " $$1 + $$2 "/5"}')
+
+gdb-grade:
+	$(call run,TMPFILE=$$(mktemp); $(MAKE) run-gdb-grade TICK_LIMIT=1000 NO_SLOWDOWN=1 TMPFILE=$$TMPFILE)
 
 # Kill all my qemus
 kill:
